@@ -1,10 +1,17 @@
 import moment from 'moment';
 import Router from 'next/router';
 import ErrorDisplay from './ErrorDisplay';
-import { IAppInstance, AppStatus, ExecMode } from '../../shared/pm2'; 
+import {IAppInstance, AppStatus, ExecMode, IApp} from '../../shared/pm2';
 import ClusterIcon from './ClusterIcon';
 import WatchIcon from './WatchIcon';
 import TableHead from './TableHead';
+import {AppAction} from "../../shared/actions";
+import StartButton from "./apps/StartButton";
+import {UserAppRight} from "../../shared/user";
+import axios from "axios";
+import {useRef, useState} from "react";
+import {useSelector} from "react-redux";
+import {IGlobalState} from "../store";
 
 function TableCell({ children, ...props }) {
   return <td 
@@ -67,11 +74,41 @@ function ApplicationRow({ app, isFirst = false }) {
 
   const postfix = <>{execMode === ExecMode.CLUSTER ? (<>{` (${pid})`}<ClusterIcon /></>) : null}{watch ? <WatchIcon /> : null}</>;
 
+  // const { app } = data;
+  // const { pm_id: pmId, name, exec_mode: execMode, instances } = app as IApp;
+  // const status = instances[0]?.pm2_env.status;
+  const isOnline = status === AppStatus.ONLINE || status === AppStatus.LAUNCHING || status === AppStatus.ONE_LAUNCH;
+  const buttonProps: any = { status };
+
+  const isMounted = useRef(true);
+  const [isWaiting, setWaiting] = useState(false);
+  const [warning, setWarning] = useState(null);
+
+  const sendAction = async (action: AppAction) => {
+    setWaiting(true);
+    setWarning(null);
+
+    try { await axios.post(`/api/apps/${name}`, { action }); }
+    catch (err) {
+      if (isMounted) {
+        setWarning([err.response?.statusText ?? 'Error', err.response?.data?.message ?? err.toString()]);
+      }
+    }
+
+    if (isMounted) {
+      // await revalidate();
+      setWaiting(false);
+    }
+  };
   return (
     <tr>
       <Td>{id}</Td>
       <Td className={`has-tooltip-${isFirst ? 'right' : 'top'}`} data-tooltip={details}>{name}{postfix}</Td>
-      <Td>{icon}{status}</Td>
+      <Td style={{width: '300px'}} onClick={e => {e.stopPropagation();}}>
+        <div>
+          <StartButton {...buttonProps} onClick={() => sendAction(isOnline ? AppAction.STOP : AppAction.START)} />
+        </div>
+        {icon}{status}</Td>
       <Td data-tooltip={mup.calendar()}>{mup.fromNow(true)}</Td>
       <Td>
         {restarts}
@@ -104,7 +141,8 @@ function EmptyTable() {
 
 export default function(props) {
   const { apps = [], isLoading = false, error = null } = props;
-
+  // console.log(apps);
+  apps.sort((a,b) => a.name > b.name ? 1 : -1)
   if (error) {
     const title = error.response?.statusText ?? 'Error';
     const text = error.response?.data?.message ?? error.toString();
@@ -115,7 +153,7 @@ export default function(props) {
   if (isLoading) { return <LoadingBar />; }
   if (apps.length === 0) { return <EmptyTable />; }
 
-  const rows = apps.map((app, index) => <ApplicationRow key={`app_row_${app.pid}`} app={app} isFirst={index === 0}/>);
+  const rows = apps.map((app, index) => <ApplicationRow key={`app_row_${index}`} app={app} isFirst={index === 0}/>);
   return (
     <div className="table-container" style={{ width: '100%' }}>
       <table className="table is-fullwidth is-bordered is-striped is-hoverable">

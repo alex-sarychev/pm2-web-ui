@@ -7,7 +7,7 @@ import ApplicationsTable from '../client/components/ApplicationsTable';
 import Layout from '../client/components/Layout';
 
 export default withRedux(withAuth(function() {
-  const { data, error, isValidating, revalidate } = useSWR('/api/apps', fetcher, { refreshInterval: 8000 });
+  const { data, error, isValidating, revalidate } = useSWR('/api/apps', fetcher, { refreshInterval: 1500 });
   const canUpdate = !isValidating && (data || error);
 
   return (
@@ -23,7 +23,7 @@ export default withRedux(withAuth(function() {
           </a>
         </div>
         <div className="panel-block" style={{ width: '100%' }}>
-          <ApplicationsTable isLoading={!data} apps={data ? data.apps : null} error={error ?? null} />
+          <ApplicationsTable isLoading={!data} apps={data ? data.apps : []} error={error ?? null} />
         </div>
       </div>
     </Layout>
